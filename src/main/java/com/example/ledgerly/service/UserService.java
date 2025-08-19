@@ -68,10 +68,8 @@ public class UserService implements UserDetailsService {
         user.setBusinessName(request.getBusinessName());
         user.setBusinessAddress(request.getBusinessAddress());
         
-        // For demo purposes, auto-verify email for OWNER role
-        if (request.getRole() == Role.OWNER) {
-            user.setEmailVerified(true);
-        }
+        // For demo purposes, auto-verify email for all users
+        user.setEmailVerified(true);
 
         // Save user
         User savedUser = userRepository.save(user);
