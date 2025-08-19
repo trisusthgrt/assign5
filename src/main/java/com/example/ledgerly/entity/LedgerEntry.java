@@ -82,6 +82,10 @@ public class LedgerEntry {
     private Customer customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shop_id", nullable = false)
+    private Shop shop;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
 
@@ -254,6 +258,14 @@ public class LedgerEntry {
 
     public void setCustomer(Customer customer) {
         this.customer = customer;
+    }
+
+    public Shop getShop() {
+        return shop;
+    }
+
+    public void setShop(Shop shop) {
+        this.shop = shop;
     }
 
     public User getCreatedBy() {

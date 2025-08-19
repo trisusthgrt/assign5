@@ -16,13 +16,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 /**
  * REST Controller for Customer management operations
  */
 @RestController
 @RequestMapping("/api/v1/customers")
-@PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
 public class CustomerController {
 
     private final CustomerService customerService;
@@ -37,9 +39,11 @@ public class CustomerController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
-    public ResponseEntity<Map<String, Object>> createCustomer(@Valid @RequestBody CustomerCreateRequest request) {
+    public ResponseEntity<Map<String, Object>> createCustomer(@Valid @RequestBody CustomerCreateRequest request,
+                                                             Authentication authentication) {
         try {
-            CustomerResponse customer = customerService.createCustomer(request);
+            String username = authentication.getName();
+            CustomerResponse customer = customerService.createCustomer(request, username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -47,12 +51,37 @@ public class CustomerController {
             response.put("customer", customer);
             
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to create customer: " + e.getMessage());
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+    
+    /**
+     * Create customer in specific shop (for owners)
+     */
+    @PostMapping("/shop/{shopId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
+    public ResponseEntity<Map<String, Object>> createCustomerInShop(@Valid @RequestBody CustomerCreateRequest request,
+                                                                   @PathVariable Long shopId,
+                                                                   Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            CustomerResponse customer = customerService.createCustomerInShop(request, username, shopId);
             
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Customer created successfully in shop");
+            response.put("customer", customer);
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -60,21 +89,22 @@ public class CustomerController {
      * Get customer by ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getCustomerById(@PathVariable Long id) {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getCustomerById(@PathVariable Long id, Authentication authentication) {
         try {
-            CustomerResponse customer = customerService.getCustomerById(id);
+            String username = authentication.getName();
+            CustomerResponse customer = customerService.getCustomerById(id, username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("customer", customer);
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -83,10 +113,12 @@ public class CustomerController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
-    public ResponseEntity<Map<String, Object>> updateCustomer(@PathVariable Long id, 
-                                                            @Valid @RequestBody CustomerUpdateRequest request) {
+    public ResponseEntity<Map<String, Object>> updateCustomer(@PathVariable Long id,
+                                                             @Valid @RequestBody CustomerUpdateRequest request,
+                                                             Authentication authentication) {
         try {
-            CustomerResponse customer = customerService.updateCustomer(id, request);
+            String username = authentication.getName();
+            CustomerResponse customer = customerService.updateCustomer(id, request, username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -94,12 +126,11 @@ public class CustomerController {
             response.put("customer", customer);
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to update customer: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -107,22 +138,22 @@ public class CustomerController {
      * Delete a customer (soft delete)
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
-    public ResponseEntity<Map<String, Object>> deleteCustomer(@PathVariable Long id) {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> deleteCustomer(@PathVariable Long id, Authentication authentication) {
         try {
-            customerService.deleteCustomer(id);
+            String username = authentication.getName();
+            customerService.deleteCustomer(id, username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Customer deleted successfully");
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -130,40 +161,61 @@ public class CustomerController {
      * Get all customers with pagination
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllCustomers(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "name") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-        
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getAllCustomers(Authentication authentication) {
         try {
-            Page<CustomerResponse> customers = customerService.getAllCustomers(page, size, sortBy, sortDir);
+            String username = authentication.getName();
+            List<CustomerResponse> customers = customerService.getAllCustomers(username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("customers", customers.getContent());
-            response.put("totalElements", customers.getTotalElements());
-            response.put("totalPages", customers.getTotalPages());
-            response.put("currentPage", customers.getNumber());
-            response.put("size", customers.getSize());
+            response.put("customers", customers);
+            response.put("count", customers.size());
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch customers: " + e.getMessage());
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+    
+    /**
+     * Get customers by shop ID
+     */
+    @GetMapping("/shop/{shopId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getCustomersByShop(@PathVariable Long shopId, 
+                                                                 Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            List<CustomerResponse> customers = customerService.getCustomersByShop(shopId, username);
             
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("customers", customers);
+            response.put("count", customers.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
     /**
-     * Get active customers only
+     * Get active customers
      */
     @GetMapping("/active")
-    public ResponseEntity<Map<String, Object>> getActiveCustomers() {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getActiveCustomers(Authentication authentication) {
         try {
-            List<CustomerResponse> customers = customerService.getActiveCustomers();
+            String username = authentication.getName();
+            // Get all customers (they are already filtered by active status in the service)
+            List<CustomerResponse> customers = customerService.getAllCustomers(username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -171,75 +223,11 @@ public class CustomerController {
             response.put("count", customers.size());
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch active customers: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-
-    /**
-     * Search customers by multiple criteria
-     */
-    @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchCustomers(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String phoneNumber,
-            @RequestParam(required = false) RelationshipType relationshipType,
-            @RequestParam(required = false) Boolean isActive,
-            @RequestParam(required = false) String businessName,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "name") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-        
-        try {
-            Page<CustomerResponse> customers = customerService.searchCustomers(
-                    name, email, phoneNumber, relationshipType, isActive, businessName, 
-                    page, size, sortBy, sortDir);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("customers", customers.getContent());
-            response.put("totalElements", customers.getTotalElements());
-            response.put("totalPages", customers.getTotalPages());
-            response.put("currentPage", customers.getNumber());
-            response.put("size", customers.getSize());
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to search customers: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-
-    /**
-     * Get customers by relationship type
-     */
-    @GetMapping("/type/{relationshipType}")
-    public ResponseEntity<Map<String, Object>> getCustomersByType(@PathVariable RelationshipType relationshipType) {
-        try {
-            List<CustomerResponse> customers = customerService.getCustomersByRelationshipType(relationshipType);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("customers", customers);
-            response.put("count", customers.size());
-            response.put("relationshipType", relationshipType);
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch customers by type: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -247,23 +235,78 @@ public class CustomerController {
      * Search customers by name
      */
     @GetMapping("/search/name")
-    public ResponseEntity<Map<String, Object>> searchCustomersByName(@RequestParam String name) {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> searchCustomersByName(@RequestParam String name,
+                                                                   Authentication authentication) {
         try {
-            List<CustomerResponse> customers = customerService.searchCustomersByName(name);
+            String username = authentication.getName();
+            List<CustomerResponse> customers = customerService.searchCustomers(name, username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("customers", customers);
             response.put("count", customers.size());
-            response.put("searchTerm", name);
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to search customers by name: " + e.getMessage());
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    /**
+     * Search customers by multiple criteria
+     */
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> searchCustomers(@RequestParam String searchTerm, 
+                                                              Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            List<CustomerResponse> customers = customerService.searchCustomers(searchTerm, username);
             
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("customers", customers);
+            response.put("count", customers.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    /**
+     * Get customers by relationship type
+     */
+    @GetMapping("/relationship/{relationshipType}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getCustomersByRelationshipType(@PathVariable RelationshipType relationshipType,
+                                                                           Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            // Filter customers by relationship type from the user's accessible shops
+            List<CustomerResponse> allCustomers = customerService.getAllCustomers(username);
+            List<CustomerResponse> filteredCustomers = allCustomers.stream()
+                    .filter(customer -> customer.getRelationshipType() == relationshipType)
+                    .collect(Collectors.toList());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("customers", filteredCustomers);
+            response.put("count", filteredCustomers.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -271,23 +314,27 @@ public class CustomerController {
      * Get customers with outstanding balance
      */
     @GetMapping("/outstanding-balance")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
-    public ResponseEntity<Map<String, Object>> getCustomersWithOutstandingBalance() {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getCustomersWithOutstandingBalance(Authentication authentication) {
         try {
-            List<CustomerResponse> customers = customerService.getCustomersWithOutstandingBalance();
+            String username = authentication.getName();
+            // Get all customers and filter by outstanding balance
+            List<CustomerResponse> allCustomers = customerService.getAllCustomers(username);
+            List<CustomerResponse> outstandingCustomers = allCustomers.stream()
+                    .filter(customer -> customer.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0)
+                    .collect(Collectors.toList());
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("customers", customers);
-            response.put("count", customers.size());
+            response.put("customers", outstandingCustomers);
+            response.put("count", outstandingCustomers.size());
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch customers with outstanding balance: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -295,27 +342,22 @@ public class CustomerController {
      * Get customer statistics
      */
     @GetMapping("/stats")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
-    public ResponseEntity<Map<String, Object>> getCustomerStats() {
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
+    public ResponseEntity<Map<String, Object>> getCustomerStatistics(Authentication authentication) {
         try {
-            CustomerService.CustomerStats stats = customerService.getCustomerStats();
+            String username = authentication.getName();
+            CustomerService.CustomerStatistics stats = customerService.getCustomerStatistics(username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("stats", Map.of(
-                    "totalCustomers", stats.getTotalCustomers(),
-                    "activeCustomers", stats.getActiveCustomers(),
-                    "totalCustomerType", stats.getTotalCustomerType(),
-                    "totalSupplierType", stats.getTotalSupplierType()
-            ));
+            response.put("statistics", stats);
             
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch customer statistics: " + e.getMessage());
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 

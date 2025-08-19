@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -113,7 +114,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     /**
      * Find customers with outstanding balance
      */
-    @Query("SELECT c FROM Customer c WHERE c.currentBalance != 0")
+    @Query("SELECT c FROM Customer c WHERE c.currentBalance > 0 AND c.isActive = true")
     List<Customer> findCustomersWithOutstandingBalance();
 
     /**
@@ -121,4 +122,24 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
      */
     @Query("SELECT c FROM Customer c WHERE c.currentBalance > c.creditLimit AND c.creditLimit > 0")
     List<Customer> findCustomersExceedingCreditLimit();
+
+    // New shop-based methods
+    boolean existsByEmailAndShopId(String email, Long shopId);
+    List<Customer> findByShopIdAndIsActiveTrue(Long shopId);
+    List<Customer> findByShopOwnerIdAndIsActiveTrue(Long ownerId);
+    List<Customer> findByShopIdAndNameContainingIgnoreCaseAndIsActiveTrue(Long shopId, String name);
+    List<Customer> findByShopOwnerIdAndNameContainingIgnoreCaseAndIsActiveTrue(Long ownerId, String name);
+    List<Customer> findByNameContainingIgnoreCaseAndIsActiveTrue(String name);
+    long countByShopIdAndIsActiveTrue(Long shopId);
+    long countByShopOwnerIdAndIsActiveTrue(Long ownerId);
+    
+    // Statistics methods
+    @Query("SELECT COALESCE(SUM(c.currentBalance), 0) FROM Customer c WHERE c.shop.id = :shopId AND c.isActive = true")
+    BigDecimal sumCurrentBalanceByShopIdAndIsActiveTrue(@Param("shopId") Long shopId);
+    
+    @Query("SELECT COALESCE(SUM(c.currentBalance), 0) FROM Customer c WHERE c.shop.owner.id = :ownerId AND c.isActive = true")
+    BigDecimal sumCurrentBalanceByShopOwnerIdAndIsActiveTrue(@Param("ownerId") Long ownerId);
+    
+    @Query("SELECT COALESCE(SUM(c.currentBalance), 0) FROM Customer c WHERE c.isActive = true")
+    BigDecimal sumCurrentBalanceByIsActiveTrue();
 }

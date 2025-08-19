@@ -1,7 +1,9 @@
 package com.example.ledgerly.service;
 
 import com.example.ledgerly.dto.AuthResponse;
+import com.example.ledgerly.dto.LoginRequest;
 import com.example.ledgerly.dto.RegisterRequest;
+import com.example.ledgerly.dto.UserUpdateRequest;
 import com.example.ledgerly.entity.Role;
 import com.example.ledgerly.entity.User;
 import com.example.ledgerly.repository.UserRepository;
@@ -12,18 +14,17 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for UserService
- */
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
@@ -42,182 +43,232 @@ class UserServiceTest {
     @InjectMocks
     private UserService userService;
 
+    private User testUser;
     private RegisterRequest registerRequest;
-    private User user;
+    private LoginRequest loginRequest;
 
     @BeforeEach
     void setUp() {
-        registerRequest = new RegisterRequest();
-        registerRequest.setUsername("testuser");
-        registerRequest.setEmail("test@example.com");
-        registerRequest.setPassword("password123");
-        registerRequest.setFirstName("Test");
-        registerRequest.setLastName("User");
-        registerRequest.setRole(Role.OWNER);
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setUsername("testuser");
+        testUser.setEmail("test@example.com");
+        testUser.setPassword("encodedPassword");
+        testUser.setFirstName("Test");
+        testUser.setLastName("User");
+        testUser.setRole(Role.STAFF);
+        testUser.setEmailVerified(true);
+        testUser.setActive(true);
+        testUser.setCreatedAt(LocalDateTime.now());
 
-        user = new User();
-        user.setId(1L);
-        user.setUsername("testuser");
-        user.setEmail("test@example.com");
-        user.setPassword("encodedPassword");
-        user.setFirstName("Test");
-        user.setLastName("User");
-        user.setRole(Role.OWNER);
-        user.setEmailVerified(true);
-        user.setActive(true);
+        registerRequest = new RegisterRequest();
+        registerRequest.setUsername("newuser");
+        registerRequest.setEmail("new@example.com");
+        registerRequest.setPassword("password123");
+        registerRequest.setFirstName("New");
+        registerRequest.setLastName("User");
+        registerRequest.setRole(Role.STAFF);
+
+        loginRequest = new LoginRequest();
+        loginRequest.setUsernameOrEmail("testuser");
+        loginRequest.setPassword("password123");
     }
 
     @Test
-    void testRegisterSuccess() {
-        // Given
+    void testRegister_Success() {
+        // Arrange
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(user);
-        when(jwtService.generateToken(any(User.class))).thenReturn("jwt-token");
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtService.generateToken(any(User.class))).thenReturn("jwtToken");
 
-        // When
+        // Act
         AuthResponse response = userService.register(registerRequest);
 
-        // Then
+        // Assert
         assertNotNull(response);
-        assertEquals("jwt-token", response.getToken());
-        assertEquals("testuser", response.getUsername());
-        assertEquals("test@example.com", response.getEmail());
-        assertEquals(Role.OWNER, response.getRole());
-        
-        verify(userRepository).existsByUsername("testuser");
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(passwordEncoder).encode("password123");
+        assertEquals("jwtToken", response.getToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals(testUser.getId(), response.getUserId());
+        assertEquals(testUser.getUsername(), response.getUsername());
+        assertEquals(testUser.getEmail(), response.getEmail());
+        assertEquals(testUser.getFirstName(), response.getFirstName());
+        assertEquals(testUser.getLastName(), response.getLastName());
+        assertEquals(testUser.getRole(), response.getRole());
+
+        verify(userRepository).existsByUsername(registerRequest.getUsername());
+        verify(userRepository).existsByEmail(registerRequest.getEmail());
+        verify(passwordEncoder).encode(registerRequest.getPassword());
         verify(userRepository).save(any(User.class));
         verify(jwtService).generateToken(any(User.class));
     }
 
     @Test
-    void testRegisterUsernameExists() {
-        // Given
+    void testRegister_UsernameAlreadyExists() {
+        // Arrange
         when(userRepository.existsByUsername(anyString())).thenReturn(true);
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            userService.register(registerRequest);
-        });
-        
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> userService.register(registerRequest));
         assertEquals("Username already exists", exception.getMessage());
-        verify(userRepository).existsByUsername("testuser");
+
+        verify(userRepository).existsByUsername(registerRequest.getUsername());
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void testRegisterEmailExists() {
-        // Given
+    void testRegister_EmailAlreadyExists() {
+        // Arrange
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userRepository.existsByEmail(anyString())).thenReturn(true);
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            userService.register(registerRequest);
-        });
-        
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> userService.register(registerRequest));
         assertEquals("Email already exists", exception.getMessage());
-        verify(userRepository).existsByUsername("testuser");
-        verify(userRepository).existsByEmail("test@example.com");
+
+        verify(userRepository).existsByUsername(registerRequest.getUsername());
+        verify(userRepository).existsByEmail(registerRequest.getEmail());
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void testFindByUsername() {
-        // Given
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+    void testRegister_OwnerRoleNotAllowed() {
+        // Arrange
+        registerRequest.setRole(Role.OWNER);
 
-        // When
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> userService.register(registerRequest));
+        assertEquals("OWNER role can only be created by an ADMIN.", exception.getMessage());
+
+        verify(userRepository, never()).existsByUsername(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testLogin_Success() {
+        // Arrange
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+            .thenReturn(mock(Authentication.class));
+        when(userRepository.findByUsernameOrEmail(anyString())).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtService.generateToken(any(User.class))).thenReturn("jwtToken");
+
+        // Act
+        AuthResponse response = userService.login(loginRequest);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals("jwtToken", response.getToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals(testUser.getId(), response.getUserId());
+
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userRepository).findByUsernameOrEmail(loginRequest.getUsernameOrEmail());
+        verify(userRepository).save(testUser);
+        verify(jwtService).generateToken(testUser);
+    }
+
+    @Test
+    void testLogin_UserNotFound() {
+        // Arrange
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+            .thenReturn(mock(Authentication.class));
+        when(userRepository.findByUsernameOrEmail(anyString())).thenReturn(Optional.empty());
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> userService.login(loginRequest));
+        assertEquals("User not found", exception.getMessage());
+
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userRepository).findByUsernameOrEmail(loginRequest.getUsernameOrEmail());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testFindByUsername_Success() {
+        // Arrange
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
+
+        // Act
         Optional<User> result = userService.findByUsername("testuser");
 
-        // Then
+        // Assert
         assertTrue(result.isPresent());
-        assertEquals("testuser", result.get().getUsername());
+        assertEquals(testUser, result.get());
         verify(userRepository).findByUsername("testuser");
     }
 
     @Test
-    void testFindByEmail() {
-        // Given
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+    void testFindByUsername_NotFound() {
+        // Arrange
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
 
-        // When
-        Optional<User> result = userService.findByEmail("test@example.com");
+        // Act
+        Optional<User> result = userService.findByUsername("nonexistent");
 
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals("test@example.com", result.get().getEmail());
-        verify(userRepository).findByEmail("test@example.com");
+        // Assert
+        assertFalse(result.isPresent());
+        verify(userRepository).findByUsername("nonexistent");
     }
 
     @Test
-    void testDeactivateUser() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenReturn(user);
+    void testFindByRole_Success() {
+        // Arrange
+        when(userRepository.findByRole(Role.STAFF)).thenReturn(java.util.List.of(testUser));
 
-        // When
-        userService.deactivateUser(1L);
+        // Act
+        java.util.List<User> result = userService.findByRole(Role.STAFF);
 
-        // Then
-        verify(userRepository).findById(1L);
-        verify(userRepository).save(any(User.class));
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testUser, result.get(0));
+        verify(userRepository).findByRole(Role.STAFF);
     }
 
     @Test
-    void testActivateUser() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenReturn(user);
+    void testFindActiveUsers_Success() {
+        // Arrange
+        when(userRepository.findByIsActiveTrue()).thenReturn(java.util.List.of(testUser));
 
-        // When
-        userService.activateUser(1L);
+        // Act
+        java.util.List<User> result = userService.findActiveUsers();
 
-        // Then
-        verify(userRepository).findById(1L);
-        verify(userRepository).save(any(User.class));
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testUser, result.get(0));
+        verify(userRepository).findByIsActiveTrue();
     }
 
     @Test
-    void testVerifyEmail() {
-        // Given
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenReturn(user);
+    void testLoadUserByUsername_Success() {
+        // Arrange
+        when(userRepository.findByUsernameOrEmail(anyString())).thenReturn(Optional.of(testUser));
 
-        // When
-        userService.verifyEmail(1L);
+        // Act
+        var result = userService.loadUserByUsername("testuser");
 
-        // Then
-        verify(userRepository).findById(1L);
-        verify(userRepository).save(any(User.class));
+        // Assert
+        assertNotNull(result);
+        assertEquals(testUser.getUsername(), result.getUsername());
+        verify(userRepository).findByUsernameOrEmail("testuser");
     }
 
     @Test
-    void testCountByRole() {
-        // Given
-        when(userRepository.countByRole(Role.OWNER)).thenReturn(5L);
+    void testLoadUserByUsername_NotFound() {
+        // Arrange
+        when(userRepository.findByUsernameOrEmail(anyString())).thenReturn(Optional.empty());
 
-        // When
-        long count = userService.countByRole(Role.OWNER);
+        // Act & Assert
+        assertThrows(org.springframework.security.core.userdetails.UsernameNotFoundException.class,
+            () -> userService.loadUserByUsername("nonexistent"));
 
-        // Then
-        assertEquals(5L, count);
-        verify(userRepository).countByRole(Role.OWNER);
-    }
-
-    @Test
-    void testCountActiveUsers() {
-        // Given
-        when(userRepository.countByIsActiveTrue()).thenReturn(10L);
-
-        // When
-        long count = userService.countActiveUsers();
-
-        // Then
-        assertEquals(10L, count);
-        verify(userRepository).countByIsActiveTrue();
+        verify(userRepository).findByUsernameOrEmail("nonexistent");
     }
 }

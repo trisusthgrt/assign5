@@ -46,6 +46,14 @@ public class UserService implements UserDetailsService {
      * Register a new user
      */
     public AuthResponse register(RegisterRequest request) {
+        // Prevent self-registration as OWNER (only ADMIN can create OWNER accounts)
+        if (request.getRole() == Role.OWNER) {
+            throw new RuntimeException("OWNER role can only be created by an ADMIN.");
+        }
+        
+        // Temporarily allow ADMIN registration for testing
+        // TODO: Remove this after testing and implement proper admin creation flow
+        
         // Check if username already exists
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Username already exists");
@@ -65,8 +73,6 @@ public class UserService implements UserDetailsService {
         user.setLastName(request.getLastName());
         user.setPhoneNumber(request.getPhoneNumber());
         user.setRole(request.getRole());
-        user.setBusinessName(request.getBusinessName());
-        user.setBusinessAddress(request.getBusinessAddress());
         
         // For demo purposes, auto-verify email for all users
         user.setEmailVerified(true);
@@ -210,7 +216,7 @@ public class UserService implements UserDetailsService {
      * Update user profile
      */
     public User updateProfile(Long userId, String firstName, String lastName, String email, 
-                             String phoneNumber, String businessName, String businessAddress) {
+                             String phoneNumber) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
@@ -223,8 +229,6 @@ public class UserService implements UserDetailsService {
         user.setLastName(lastName);
         user.setEmail(email);
         user.setPhoneNumber(phoneNumber);
-        user.setBusinessName(businessName);
-        user.setBusinessAddress(businessAddress);
         
         return userRepository.save(user);
     }
@@ -240,16 +244,16 @@ public class UserService implements UserDetailsService {
     /**
      * Create AuthResponse from User and JWT token
      */
-    private AuthResponse createAuthResponse(User user, String jwtToken) {
+    private AuthResponse createAuthResponse(User user, String token) {
         AuthResponse response = new AuthResponse();
-        response.setToken(jwtToken);
+        response.setToken(token);
+        response.setTokenType("Bearer");
         response.setUserId(user.getId());
         response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFirstName(user.getFirstName());
         response.setLastName(user.getLastName());
         response.setRole(user.getRole());
-        response.setBusinessName(user.getBusinessName());
         response.setEmailVerified(user.isEmailVerified());
         response.setPhoneVerified(user.isPhoneVerified());
         return response;

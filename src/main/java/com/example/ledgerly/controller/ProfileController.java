@@ -43,19 +43,15 @@ public class ProfileController {
             Map<String, Object> profile = new HashMap<>();
             profile.put("id", user.getId());
             profile.put("username", user.getUsername());
-            profile.put("email", user.getEmail());
             profile.put("firstName", user.getFirstName());
             profile.put("lastName", user.getLastName());
-            profile.put("fullName", user.getFullName());
+            profile.put("email", user.getEmail());
             profile.put("phoneNumber", user.getPhoneNumber());
             profile.put("role", user.getRole());
-            profile.put("businessName", user.getBusinessName());
-            profile.put("businessAddress", user.getBusinessAddress());
             profile.put("isActive", user.isActive());
             profile.put("isEmailVerified", user.isEmailVerified());
             profile.put("isPhoneVerified", user.isPhoneVerified());
             profile.put("createdAt", user.getCreatedAt());
-            profile.put("updatedAt", user.getUpdatedAt());
             profile.put("lastLogin", user.getLastLogin());
             
             return ResponseEntity.ok(profile);
@@ -84,9 +80,7 @@ public class ProfileController {
                 request.getFirstName(),
                 request.getLastName(),
                 request.getEmail(),
-                request.getPhoneNumber(),
-                request.getBusinessName(),
-                request.getBusinessAddress()
+                request.getPhoneNumber()
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -116,9 +110,7 @@ public class ProfileController {
                 request.getFirstName(),
                 request.getLastName(),
                 request.getEmail(),
-                request.getPhoneNumber(),
-                request.getBusinessName(),
-                request.getBusinessAddress()
+                request.getPhoneNumber()
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -156,46 +148,6 @@ public class ProfileController {
     }
 
     /**
-     * Update business details only
-     */
-    @PutMapping("/business")
-    @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> updateBusinessDetails(@RequestBody Map<String, String> businessDetails) {
-        try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
-            
-            User currentUser = userService.getUserProfile(username);
-            
-            String businessName = businessDetails.get("businessName");
-            String businessAddress = businessDetails.get("businessAddress");
-            
-            User updatedUser = userService.updateProfile(
-                currentUser.getId(),
-                currentUser.getFirstName(),
-                currentUser.getLastName(),
-                currentUser.getEmail(),
-                currentUser.getPhoneNumber(),
-                businessName,
-                businessAddress
-            );
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Business details updated successfully");
-            response.put("businessName", updatedUser.getBusinessName());
-            response.put("businessAddress", updatedUser.getBusinessAddress());
-            response.put("timestamp", System.currentTimeMillis());
-            
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            errorResponse.put("timestamp", System.currentTimeMillis());
-            return ResponseEntity.badRequest().body(errorResponse);
-        }
-    }
-
-    /**
      * Update contact info only
      */
     @PutMapping("/contact")
@@ -215,9 +167,7 @@ public class ProfileController {
                 currentUser.getFirstName(),
                 currentUser.getLastName(),
                 email,
-                phoneNumber,
-                currentUser.getBusinessName(),
-                currentUser.getBusinessAddress()
+                phoneNumber
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -242,19 +192,15 @@ public class ProfileController {
         Map<String, Object> profile = new HashMap<>();
         profile.put("id", user.getId());
         profile.put("username", user.getUsername());
-        profile.put("email", user.getEmail());
         profile.put("firstName", user.getFirstName());
         profile.put("lastName", user.getLastName());
-        profile.put("fullName", user.getFullName());
+        profile.put("email", user.getEmail());
         profile.put("phoneNumber", user.getPhoneNumber());
         profile.put("role", user.getRole());
-        profile.put("businessName", user.getBusinessName());
-        profile.put("businessAddress", user.getBusinessAddress());
         profile.put("isActive", user.isActive());
         profile.put("isEmailVerified", user.isEmailVerified());
         profile.put("isPhoneVerified", user.isPhoneVerified());
         profile.put("createdAt", user.getCreatedAt());
-        profile.put("updatedAt", user.getUpdatedAt());
         profile.put("lastLogin", user.getLastLogin());
         return profile;
     }

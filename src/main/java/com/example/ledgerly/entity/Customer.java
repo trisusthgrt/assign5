@@ -37,6 +37,10 @@ public class Customer {
     @Column(name = "address", length = 500)
     private String address;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shop_id", nullable = false)
+    private Shop shop;
+    
     @Column(name = "business_name")
     private String businessName;
 
@@ -134,6 +138,14 @@ public class Customer {
 
     public void setBusinessName(String businessName) {
         this.businessName = businessName;
+    }
+    
+    public Shop getShop() {
+        return shop;
+    }
+    
+    public void setShop(Shop shop) {
+        this.shop = shop;
     }
 
     public String getGstNumber() {

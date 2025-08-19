@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * REST Controller for authentication operations
@@ -74,17 +75,12 @@ public class AuthController {
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", user.getId());
         userInfo.put("username", user.getUsername());
-        userInfo.put("email", user.getEmail());
         userInfo.put("firstName", user.getFirstName());
         userInfo.put("lastName", user.getLastName());
-        userInfo.put("fullName", user.getFullName());
         userInfo.put("role", user.getRole());
-        userInfo.put("businessName", user.getBusinessName());
-        userInfo.put("businessAddress", user.getBusinessAddress());
-        userInfo.put("phoneNumber", user.getPhoneNumber());
-        userInfo.put("isActive", user.isActive());
-        userInfo.put("isEmailVerified", user.isEmailVerified());
-        userInfo.put("isPhoneVerified", user.isPhoneVerified());
+        userInfo.put("fullName", user.getFirstName() + " " + user.getLastName());
+        userInfo.put("emailVerified", user.isEmailVerified());
+        userInfo.put("phoneVerified", user.isPhoneVerified());
         userInfo.put("createdAt", user.getCreatedAt());
         userInfo.put("lastLogin", user.getLastLogin());
 
@@ -212,17 +208,12 @@ public class AuthController {
             Map<String, Object> userInfo = new HashMap<>();
             userInfo.put("id", user.getId());
             userInfo.put("username", user.getUsername());
-            userInfo.put("email", user.getEmail());
             userInfo.put("firstName", user.getFirstName());
             userInfo.put("lastName", user.getLastName());
-            userInfo.put("fullName", user.getFullName());
             userInfo.put("role", user.getRole());
-            userInfo.put("businessName", user.getBusinessName());
-            userInfo.put("businessAddress", user.getBusinessAddress());
-            userInfo.put("phoneNumber", user.getPhoneNumber());
-            userInfo.put("isActive", user.isActive());
-            userInfo.put("isEmailVerified", user.isEmailVerified());
-            userInfo.put("isPhoneVerified", user.isPhoneVerified());
+            userInfo.put("fullName", user.getFirstName() + " " + user.getLastName());
+            userInfo.put("emailVerified", user.isEmailVerified());
+            userInfo.put("phoneVerified", user.isPhoneVerified());
             userInfo.put("createdAt", user.getCreatedAt());
             userInfo.put("lastLogin", user.getLastLogin());
 
@@ -243,6 +234,23 @@ public class AuthController {
         response.put("status", "UP");
         response.put("service", "Authentication Service");
         response.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/test-auth")
+    public ResponseEntity<Map<String, Object>> testAuth(Authentication authentication) {
+        Map<String, Object> response = new HashMap<>();
+        if (authentication != null && authentication.isAuthenticated()) {
+            response.put("authenticated", true);
+            response.put("username", authentication.getName());
+            response.put("authorities", authentication.getAuthorities().stream()
+                    .map(Object::toString)
+                    .collect(Collectors.toList()));
+            response.put("principal", authentication.getPrincipal().getClass().getSimpleName());
+        } else {
+            response.put("authenticated", false);
+            response.put("message", "No authentication found");
+        }
         return ResponseEntity.ok(response);
     }
 }

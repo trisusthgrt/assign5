@@ -9,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -54,11 +55,12 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Role role;
 
-    @Column(name = "business_name")
-    private String businessName;
-
-    @Column(name = "business_address")
-    private String businessAddress;
+    // Business information
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Shop> shops = new ArrayList<>();
+    
+    @OneToOne(mappedBy = "staff", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private StaffShopMapping staffShopMapping;
 
     @Column(name = "is_active")
     private boolean isActive = true;
@@ -196,20 +198,20 @@ public class User implements UserDetails {
         this.role = role;
     }
 
-    public String getBusinessName() {
-        return businessName;
+    public List<Shop> getShops() {
+        return shops;
     }
 
-    public void setBusinessName(String businessName) {
-        this.businessName = businessName;
+    public void setShops(List<Shop> shops) {
+        this.shops = shops;
     }
 
-    public String getBusinessAddress() {
-        return businessAddress;
+    public StaffShopMapping getStaffShopMapping() {
+        return staffShopMapping;
     }
 
-    public void setBusinessAddress(String businessAddress) {
-        this.businessAddress = businessAddress;
+    public void setStaffShopMapping(StaffShopMapping staffShopMapping) {
+        this.staffShopMapping = staffShopMapping;
     }
 
     public boolean isActive() {

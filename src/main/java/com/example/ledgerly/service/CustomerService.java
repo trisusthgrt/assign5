@@ -5,118 +5,144 @@ import com.example.ledgerly.dto.CustomerResponse;
 import com.example.ledgerly.dto.CustomerUpdateRequest;
 import com.example.ledgerly.entity.Customer;
 import com.example.ledgerly.entity.RelationshipType;
+import com.example.ledgerly.entity.Shop;
+import com.example.ledgerly.entity.StaffShopMapping;
 import com.example.ledgerly.entity.User;
 import com.example.ledgerly.repository.CustomerRepository;
+import com.example.ledgerly.repository.StaffShopMappingRepository;
 import com.example.ledgerly.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * Service class for Customer entity operations
- */
 @Service
-@Transactional
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final StaffShopMappingRepository staffShopMappingRepository;
 
     @Autowired
-    public CustomerService(CustomerRepository customerRepository, UserRepository userRepository) {
+    public CustomerService(CustomerRepository customerRepository, 
+                         UserRepository userRepository,
+                         StaffShopMappingRepository staffShopMappingRepository) {
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
+        this.staffShopMappingRepository = staffShopMappingRepository;
     }
 
     /**
-     * Create a new customer
+     * Create a new customer with automatic shop assignment
      */
-    public CustomerResponse createCustomer(CustomerCreateRequest request) {
-        // Get current user
-        User currentUser = getCurrentUser();
+    public CustomerResponse createCustomer(CustomerCreateRequest request, String username) {
+        User createdBy = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if email already exists
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            customerRepository.findByEmailIgnoreCase(request.getEmail().trim())
-                    .ifPresent(customer -> {
-                        throw new RuntimeException("Customer with email " + request.getEmail() + " already exists");
-                    });
+        // Get the shop for staff users
+        Shop customerShop = null;
+        if (createdBy.getRole().name().equals("STAFF")) {
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(createdBy.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            customerShop = mapping.getShop();
+        } else if (createdBy.getRole().name().equals("OWNER")) {
+            // For owners, they need to specify which shop to create customer in
+            // This will be handled by the controller
+            throw new RuntimeException("Owners must specify shop when creating customers");
         }
 
-        // Check if phone number already exists
-        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
-            customerRepository.findByPhoneNumber(request.getPhoneNumber().trim())
-                    .ifPresent(customer -> {
-                        throw new RuntimeException("Customer with phone number " + request.getPhoneNumber() + " already exists");
-                    });
+        // Check if customer email already exists in the same shop
+        if (customerShop != null && customerRepository.existsByEmailAndShopId(request.getEmail(), customerShop.getId())) {
+            throw new RuntimeException("Customer with this email already exists in this shop");
         }
 
-        // Create new customer
         Customer customer = new Customer();
-        customer.setName(request.getName().trim());
-        customer.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
-        customer.setPhoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null);
+        customer.setName(request.getName());
+        customer.setEmail(request.getEmail());
+        customer.setPhoneNumber(request.getPhoneNumber());
         customer.setAddress(request.getAddress());
         customer.setBusinessName(request.getBusinessName());
         customer.setGstNumber(request.getGstNumber());
         customer.setPanNumber(request.getPanNumber());
         customer.setRelationshipType(request.getRelationshipType());
         customer.setNotes(request.getNotes());
-        customer.setCreditLimit(request.getCreditLimit());
-        customer.setCreatedBy(currentUser);
+        customer.setCreditLimit(request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO);
+        customer.setCurrentBalance(BigDecimal.ZERO);
+        customer.setCreatedBy(createdBy);
+        customer.setShop(customerShop);
 
         Customer savedCustomer = customerRepository.save(customer);
-        return convertToResponse(savedCustomer);
+        return mapToResponse(savedCustomer);
     }
 
     /**
-     * Get customer by ID
+     * Create a customer in a specific shop (for owners)
      */
-    public CustomerResponse getCustomerById(Long id) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found with id: " + id));
-        return convertToResponse(customer);
+    public CustomerResponse createCustomerInShop(CustomerCreateRequest request, String username, Long shopId) {
+        User createdBy = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Verify the user owns this shop or is admin
+        if (!createdBy.getRole().name().equals("OWNER") && !createdBy.getRole().name().equals("ADMIN")) {
+            throw new RuntimeException("Only owners and admins can create customers in specific shops");
+        }
+
+        // Check if customer email already exists in the same shop
+        if (customerRepository.existsByEmailAndShopId(request.getEmail(), shopId)) {
+            throw new RuntimeException("Customer with this email already exists in this shop");
+        }
+
+        Customer customer = new Customer();
+        customer.setName(request.getName());
+        customer.setEmail(request.getEmail());
+        customer.setPhoneNumber(request.getPhoneNumber());
+        customer.setAddress(request.getAddress());
+        customer.setBusinessName(request.getBusinessName());
+        customer.setGstNumber(request.getGstNumber());
+        customer.setPanNumber(request.getPanNumber());
+        customer.setRelationshipType(request.getRelationshipType());
+        customer.setNotes(request.getNotes());
+        customer.setCreditLimit(request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO);
+        customer.setCurrentBalance(BigDecimal.ZERO);
+        customer.setCreatedBy(createdBy);
+
+        Customer savedCustomer = customerRepository.save(customer);
+        return mapToResponse(savedCustomer);
     }
 
     /**
-     * Update an existing customer
+     * Update customer with shop validation
      */
-    public CustomerResponse updateCustomer(Long id, CustomerUpdateRequest request) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found with id: " + id));
+    public CustomerResponse updateCustomer(Long customerId, CustomerUpdateRequest request, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if email already exists (excluding current customer)
-        if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            if (customerRepository.existsByEmailIgnoreCaseAndIdNot(request.getEmail().trim(), id)) {
-                throw new RuntimeException("Customer with email " + request.getEmail() + " already exists");
-            }
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        // Validate shop access
+        validateShopAccess(currentUser, customer.getShop());
+
+        // Check if email is being changed and if it already exists in the same shop
+        if (!customer.getEmail().equals(request.getEmail()) && 
+            customerRepository.existsByEmailAndShopId(request.getEmail(), customer.getShop().getId())) {
+            throw new RuntimeException("Customer with this email already exists in this shop");
         }
 
-        // Check if phone number already exists (excluding current customer)
-        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
-            if (customerRepository.existsByPhoneNumberAndIdNot(request.getPhoneNumber().trim(), id)) {
-                throw new RuntimeException("Customer with phone number " + request.getPhoneNumber() + " already exists");
-            }
-        }
-
-        // Update customer fields (only if provided)
+        // Update fields
         if (request.getName() != null) {
-            customer.setName(request.getName().trim());
+            customer.setName(request.getName());
         }
         if (request.getEmail() != null) {
-            customer.setEmail(request.getEmail().trim());
+            customer.setEmail(request.getEmail());
         }
         if (request.getPhoneNumber() != null) {
-            customer.setPhoneNumber(request.getPhoneNumber().trim());
+            customer.setPhoneNumber(request.getPhoneNumber());
         }
         if (request.getAddress() != null) {
             customer.setAddress(request.getAddress());
@@ -139,112 +165,189 @@ public class CustomerService {
         if (request.getCreditLimit() != null) {
             customer.setCreditLimit(request.getCreditLimit());
         }
-        if (request.getIsActive() != null) {
-            customer.setActive(request.getIsActive());
-        }
 
-        Customer savedCustomer = customerRepository.save(customer);
-        return convertToResponse(savedCustomer);
+        Customer updatedCustomer = customerRepository.save(customer);
+        return mapToResponse(updatedCustomer);
     }
 
     /**
-     * Delete a customer (soft delete - mark as inactive)
+     * Get customer by ID with shop validation
      */
-    public void deleteCustomer(Long id) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found with id: " + id));
-        
+    public CustomerResponse getCustomerById(Long customerId, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        // Validate shop access
+        validateShopAccess(currentUser, customer.getShop());
+
+        return mapToResponse(customer);
+    }
+
+    /**
+     * Get all customers for current user (filtered by shop)
+     */
+    public List<CustomerResponse> getAllCustomers(String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<Customer> customers;
+        if (currentUser.getRole().name().equals("STAFF")) {
+            // Staff can only see customers from their assigned shop
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(currentUser.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            customers = customerRepository.findByShopIdAndIsActiveTrue(mapping.getShop().getId());
+        } else if (currentUser.getRole().name().equals("OWNER")) {
+            // Owners can see customers from all their shops
+            customers = customerRepository.findByShopOwnerIdAndIsActiveTrue(currentUser.getId());
+        } else if (currentUser.getRole().name().equals("ADMIN")) {
+            // Admins can see all customers
+            customers = customerRepository.findByIsActiveTrue();
+        } else {
+            throw new RuntimeException("Invalid user role");
+        }
+
+        return customers.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get customers by shop ID with validation
+     */
+    public List<CustomerResponse> getCustomersByShop(Long shopId, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Validate shop access
+        validateShopAccess(currentUser, shopId);
+
+        List<Customer> customers = customerRepository.findByShopIdAndIsActiveTrue(shopId);
+        return customers.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Delete customer with shop validation
+     */
+    public void deleteCustomer(Long customerId, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        // Validate shop access
+        validateShopAccess(currentUser, customer.getShop());
+
+        // Soft delete
         customer.setActive(false);
         customerRepository.save(customer);
     }
 
     /**
-     * Get all customers with pagination
+     * Search customers with shop filtering
      */
-    public Page<CustomerResponse> getAllCustomers(int page, int size, String sortBy, String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        
-        Pageable pageable = PageRequest.of(page, size, sort);
-        Page<Customer> customers = customerRepository.findAll(pageable);
-        
-        return customers.map(this::convertToResponse);
-    }
+    public List<CustomerResponse> searchCustomers(String searchTerm, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-    /**
-     * Get active customers only
-     */
-    public List<CustomerResponse> getActiveCustomers() {
-        List<Customer> customers = customerRepository.findByIsActiveTrue();
+        List<Customer> customers;
+        if (currentUser.getRole().name().equals("STAFF")) {
+            // Staff can only search in their assigned shop
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(currentUser.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            customers = customerRepository.findByShopIdAndNameContainingIgnoreCaseAndIsActiveTrue(
+                    mapping.getShop().getId(), searchTerm);
+        } else if (currentUser.getRole().name().equals("OWNER")) {
+            // Owners can search in all their shops
+            customers = customerRepository.findByShopOwnerIdAndNameContainingIgnoreCaseAndIsActiveTrue(
+                    currentUser.getId(), searchTerm);
+        } else if (currentUser.getRole().name().equals("ADMIN")) {
+            // Admins can search in all shops
+            customers = customerRepository.findByNameContainingIgnoreCaseAndIsActiveTrue(searchTerm);
+        } else {
+            throw new RuntimeException("Invalid user role");
+        }
+
         return customers.stream()
-                .map(this::convertToResponse)
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Search customers by multiple criteria
+     * Get customer statistics with shop filtering
      */
-    public Page<CustomerResponse> searchCustomers(String name, String email, String phoneNumber,
-                                                RelationshipType relationshipType, Boolean isActive,
-                                                String businessName, int page, int size,
-                                                String sortBy, String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+    public CustomerStatistics getCustomerStatistics(String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        CustomerStatistics stats = new CustomerStatistics();
         
-        Pageable pageable = PageRequest.of(page, size, sort);
+        if (currentUser.getRole().name().equals("STAFF")) {
+            // Staff statistics for their assigned shop
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(currentUser.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            stats.setTotalCustomers(customerRepository.countByShopIdAndIsActiveTrue(mapping.getShop().getId()));
+            stats.setTotalBalance(customerRepository.sumCurrentBalanceByShopIdAndIsActiveTrue(mapping.getShop().getId()));
+        } else if (currentUser.getRole().name().equals("OWNER")) {
+            // Owner statistics for all their shops
+            stats.setTotalCustomers(customerRepository.countByShopOwnerIdAndIsActiveTrue(currentUser.getId()));
+            stats.setTotalBalance(customerRepository.sumCurrentBalanceByShopOwnerIdAndIsActiveTrue(currentUser.getId()));
+        } else if (currentUser.getRole().name().equals("ADMIN")) {
+            // Admin statistics for all shops
+            stats.setTotalCustomers(customerRepository.countByIsActiveTrue());
+            stats.setTotalBalance(customerRepository.sumCurrentBalanceByIsActiveTrue());
+        }
+
+        return stats;
+    }
+
+    /**
+     * Validate shop access for current user
+     */
+    private void validateShopAccess(User currentUser, Shop shop) {
+        if (currentUser.getRole().name().equals("ADMIN")) {
+            return; // Admin can access all shops
+        }
         
-        Page<Customer> customers = customerRepository.searchCustomers(
-                name, email, phoneNumber, relationshipType, isActive, businessName, pageable);
+        if (currentUser.getRole().name().equals("OWNER")) {
+            if (!shop.getOwner().getId().equals(currentUser.getId())) {
+                throw new RuntimeException("Access denied: You don't own this shop");
+            }
+        } else if (currentUser.getRole().name().equals("STAFF")) {
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(currentUser.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            if (!mapping.getShop().getId().equals(shop.getId())) {
+                throw new RuntimeException("Access denied: You can only access customers from your assigned shop");
+            }
+        }
+    }
+
+    /**
+     * Validate shop access by shop ID
+     */
+    private void validateShopAccess(User currentUser, Long shopId) {
+        if (currentUser.getRole().name().equals("ADMIN")) {
+            return; // Admin can access all shops
+        }
         
-        return customers.map(this::convertToResponse);
+        if (currentUser.getRole().name().equals("OWNER")) {
+            // Owner can access their own shops
+            // This validation will be done at the controller level
+        } else if (currentUser.getRole().name().equals("STAFF")) {
+            StaffShopMapping mapping = staffShopMappingRepository.findByStaffId(currentUser.getId())
+                    .orElseThrow(() -> new RuntimeException("Staff is not assigned to any shop"));
+            if (!mapping.getShop().getId().equals(shopId)) {
+                throw new RuntimeException("Access denied: You can only access customers from your assigned shop");
+            }
+        }
     }
 
-    /**
-     * Get customers by relationship type
-     */
-    public List<CustomerResponse> getCustomersByRelationshipType(RelationshipType relationshipType) {
-        List<Customer> customers = customerRepository.findByRelationshipTypeAndIsActive(relationshipType, true);
-        return customers.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Search customers by name
-     */
-    public List<CustomerResponse> searchCustomersByName(String name) {
-        List<Customer> customers = customerRepository.findByNameContainingIgnoreCase(name);
-        return customers.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Get customers with outstanding balance
-     */
-    public List<CustomerResponse> getCustomersWithOutstandingBalance() {
-        List<Customer> customers = customerRepository.findCustomersWithOutstandingBalance();
-        return customers.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Get customer statistics
-     */
-    public CustomerStats getCustomerStats() {
-        long totalCustomers = customerRepository.count();
-        long activeCustomers = customerRepository.countByIsActiveTrue();
-        long totalCustomerType = customerRepository.countByRelationshipType(RelationshipType.CUSTOMER);
-        long totalSupplierType = customerRepository.countByRelationshipType(RelationshipType.SUPPLIER);
-        
-        return new CustomerStats(totalCustomers, activeCustomers, totalCustomerType, totalSupplierType);
-    }
-
-    /**
-     * Convert Customer entity to CustomerResponse DTO
-     */
-    private CustomerResponse convertToResponse(Customer customer) {
+    private CustomerResponse mapToResponse(Customer customer) {
         CustomerResponse response = new CustomerResponse();
         response.setId(customer.getId());
         response.setName(customer.getName());
@@ -262,38 +365,23 @@ public class CustomerService {
         response.setCreatedAt(customer.getCreatedAt());
         response.setUpdatedAt(customer.getUpdatedAt());
         response.setCreatedByUsername(customer.getCreatedBy().getUsername());
+        
+        if (customer.getShop() != null) {
+            response.setShopId(customer.getShop().getId());
+            response.setShopName(customer.getShop().getName());
+        }
+        
         return response;
     }
 
-    /**
-     * Get current authenticated user
-     */
-    private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        return userRepository.findByUsernameOrEmail(username)
-                .orElseThrow(() -> new RuntimeException("Current user not found"));
-    }
-
-    /**
-     * Inner class for customer statistics
-     */
-    public static class CustomerStats {
-        private final long totalCustomers;
-        private final long activeCustomers;
-        private final long totalCustomerType;
-        private final long totalSupplierType;
-
-        public CustomerStats(long totalCustomers, long activeCustomers, long totalCustomerType, long totalSupplierType) {
-            this.totalCustomers = totalCustomers;
-            this.activeCustomers = activeCustomers;
-            this.totalCustomerType = totalCustomerType;
-            this.totalSupplierType = totalSupplierType;
-        }
+    // Statistics class
+    public static class CustomerStatistics {
+        private long totalCustomers;
+        private BigDecimal totalBalance;
 
         public long getTotalCustomers() { return totalCustomers; }
-        public long getActiveCustomers() { return activeCustomers; }
-        public long getTotalCustomerType() { return totalCustomerType; }
-        public long getTotalSupplierType() { return totalSupplierType; }
+        public void setTotalCustomers(long totalCustomers) { this.totalCustomers = totalCustomers; }
+        public BigDecimal getTotalBalance() { return totalBalance; }
+        public void setTotalBalance(BigDecimal totalBalance) { this.totalBalance = totalBalance; }
     }
 }

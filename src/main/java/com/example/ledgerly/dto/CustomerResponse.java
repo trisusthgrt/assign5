@@ -26,6 +26,10 @@ public class CustomerResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String createdByUsername;
+    
+    // Shop information
+    private Long shopId;
+    private String shopName;
 
     // Constructors
     public CustomerResponse() {
@@ -168,5 +172,21 @@ public class CustomerResponse {
 
     public void setCreatedByUsername(String createdByUsername) {
         this.createdByUsername = createdByUsername;
+    }
+
+    public Long getShopId() {
+        return shopId;
+    }
+
+    public void setShopId(Long shopId) {
+        this.shopId = shopId;
+    }
+
+    public String getShopName() {
+        return shopName;
+    }
+
+    public void setShopName(String shopName) {
+        this.shopName = shopName;
     }
 }
