@@ -14,9 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * REST Controller for user profile management
- */
 @RestController
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
@@ -28,9 +25,6 @@ public class ProfileController {
         this.userService = userService;
     }
 
-    /**
-     * Get current user's profile
-     */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getCurrentUserProfile() {
@@ -63,9 +57,6 @@ public class ProfileController {
         }
     }
 
-    /**
-     * Update current user's profile
-     */
     @PutMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> updateCurrentUserProfile(@Valid @RequestBody ProfileUpdateRequest request) {
@@ -97,9 +88,6 @@ public class ProfileController {
         }
     }
 
-    /**
-     * Update user profile by ID (Admin and Owner only)
-     */
     @PutMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> updateUserProfile(@PathVariable Long userId, 
@@ -127,9 +115,6 @@ public class ProfileController {
         }
     }
 
-    /**
-     * Get profile by user ID (Admin and Owner only)
-     */
     @GetMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> getUserProfile(@PathVariable Long userId) {
@@ -147,9 +132,6 @@ public class ProfileController {
         }
     }
 
-    /**
-     * Update contact info only
-     */
     @PutMapping("/contact")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> updateContactInfo(@RequestBody Map<String, String> contactInfo) {
@@ -185,9 +167,6 @@ public class ProfileController {
         }
     }
 
-    /**
-     * Helper method to create profile response
-     */
     private Map<String, Object> createProfileResponse(User user) {
         Map<String, Object> profile = new HashMap<>();
         profile.put("id", user.getId());

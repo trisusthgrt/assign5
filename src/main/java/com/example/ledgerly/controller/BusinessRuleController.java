@@ -11,9 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * REST Controller for Business Rules management
- */
 @RestController
 @RequestMapping("/api/v1/business-rules")
 @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
@@ -26,9 +23,6 @@ public class BusinessRuleController {
         this.businessRuleService = businessRuleService;
     }
 
-    /**
-     * Get current business rule configuration
-     */
     @GetMapping("/configuration")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> getBusinessRuleConfiguration() {
@@ -55,9 +49,6 @@ public class BusinessRuleController {
         }
     }
 
-    /**
-     * Get business rule descriptions
-     */
     @GetMapping("/descriptions")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
     public ResponseEntity<Map<String, Object>> getBusinessRuleDescriptions() {

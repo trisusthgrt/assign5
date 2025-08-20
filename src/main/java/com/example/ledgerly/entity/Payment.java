@@ -12,9 +12,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * Entity representing a payment made by or to a customer
- */
 @Entity
 @Table(name = "payments")
 public class Payment {
@@ -111,7 +108,6 @@ public class Payment {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
@@ -128,7 +124,6 @@ public class Payment {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
-    // Audit fields
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -137,7 +132,6 @@ public class Payment {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Constructors
     public Payment() {
     }
 
@@ -151,7 +145,6 @@ public class Payment {
         this.createdBy = createdBy;
     }
 
-    // Helper methods
     public BigDecimal getUnappliedAmount() {
         return amount.subtract(appliedAmount);
     }
@@ -192,7 +185,6 @@ public class Payment {
         }
     }
 
-    // Status management helper methods
     public void updateStatus(PaymentStatus newStatus, User updatedBy, String notes) {
         if (!this.status.canBeUpdated()) {
             throw new IllegalStateException("Payment status cannot be updated from " + this.status);
@@ -250,7 +242,6 @@ public class Payment {
         this.lastReminderSent = LocalDate.now();
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

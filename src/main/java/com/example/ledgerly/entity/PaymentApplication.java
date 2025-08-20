@@ -8,9 +8,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Entity representing the application of a payment to a specific ledger entry
- */
 @Entity
 @Table(name = "payment_applications")
 public class PaymentApplication {
@@ -38,7 +35,6 @@ public class PaymentApplication {
     @JoinColumn(name = "reversed_by_user_id")
     private User reversedBy;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", nullable = false)
     private Payment payment;
@@ -51,12 +47,10 @@ public class PaymentApplication {
     @JoinColumn(name = "applied_by_user_id", nullable = false)
     private User appliedBy;
 
-    // Audit fields
     @CreationTimestamp
     @Column(name = "applied_at", nullable = false, updatable = false)
     private LocalDateTime appliedAt;
 
-    // Constructors
     public PaymentApplication() {
     }
 
@@ -68,14 +62,12 @@ public class PaymentApplication {
         this.appliedBy = appliedBy;
     }
 
-    // Helper methods
     public void reverse(User reversedBy) {
         this.isReversed = true;
         this.reversedAt = LocalDateTime.now();
         this.reversedBy = reversedBy;
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

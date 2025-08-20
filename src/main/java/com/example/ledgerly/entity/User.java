@@ -13,9 +13,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * User entity representing system users with different roles
- */
 @Entity
 @Table(name = "users")
 public class User implements UserDetails {
@@ -55,7 +52,6 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Role role;
 
-    // Business information
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Shop> shops = new ArrayList<>();
     
@@ -80,7 +76,6 @@ public class User implements UserDetails {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
-    // Constructors
     public User() {
     }
 
@@ -93,7 +88,6 @@ public class User implements UserDetails {
         this.role = role;
     }
 
-    // JPA lifecycle methods
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -105,7 +99,6 @@ public class User implements UserDetails {
         updatedAt = LocalDateTime.now();
     }
 
-    // UserDetails implementation
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
@@ -141,7 +134,6 @@ public class User implements UserDetails {
         return isActive && isEmailVerified;
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

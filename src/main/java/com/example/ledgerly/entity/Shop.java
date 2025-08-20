@@ -7,9 +7,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Shop entity representing a business location/store
- */
 @Entity
 @Table(name = "shops")
 public class Shop {
@@ -58,7 +55,6 @@ public class Shop {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
@@ -72,7 +68,6 @@ public class Shop {
     @OneToMany(mappedBy = "shop", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Payment> payments = new ArrayList<>();
     
-    // Constructors
     public Shop() {
     }
     
@@ -82,7 +77,6 @@ public class Shop {
         this.owner = owner;
     }
     
-    // JPA lifecycle methods
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -94,7 +88,6 @@ public class Shop {
         updatedAt = LocalDateTime.now();
     }
     
-    // Getters and Setters
     public Long getId() {
         return id;
     }

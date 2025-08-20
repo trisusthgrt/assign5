@@ -13,9 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * REST Controller for file operations
- */
 @RestController
 @RequestMapping("/api/v1/files")
 @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER') or hasRole('STAFF')")
@@ -28,9 +25,6 @@ public class FileController {
         this.fileUploadService = fileUploadService;
     }
 
-    /**
-     * Download file by attachment ID
-     */
     @GetMapping("/download/{attachmentId}")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long attachmentId) {
         try {
@@ -48,9 +42,6 @@ public class FileController {
         }
     }
 
-    /**
-     * Get file storage statistics
-     */
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> getFileStorageStats() {

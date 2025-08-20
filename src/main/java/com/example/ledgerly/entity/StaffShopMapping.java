@@ -3,10 +3,6 @@ package com.example.ledgerly.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-/**
- * Entity to map staff users to specific shops
- * One staff can belong to only one shop
- */
 @Entity
 @Table(name = "staff_shop_mappings")
 public class StaffShopMapping {
@@ -29,7 +25,6 @@ public class StaffShopMapping {
     @Column(name = "is_active")
     private boolean isActive = true;
     
-    // Constructors
     public StaffShopMapping() {
     }
     
@@ -39,7 +34,6 @@ public class StaffShopMapping {
         this.assignedAt = LocalDateTime.now();
     }
     
-    // Getters and Setters
     public Long getId() {
         return id;
     }

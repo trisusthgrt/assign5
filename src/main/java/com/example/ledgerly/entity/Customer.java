@@ -10,9 +10,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Customer entity representing a business customer/client
- */
 @Entity
 @Table(name = "customers")
 public class Customer {
@@ -66,7 +63,6 @@ public class Customer {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    // Audit fields
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -79,7 +75,6 @@ public class Customer {
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
 
-    // Constructors
     public Customer() {
     }
 
@@ -91,7 +86,6 @@ public class Customer {
         this.createdBy = createdBy;
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

@@ -7,9 +7,6 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * Entity representing file attachments for ledger entries
- */
 @Entity
 @Table(name = "document_attachments")
 public class DocumentAttachment {
@@ -56,7 +53,6 @@ public class DocumentAttachment {
     @JoinColumn(name = "uploaded_by_user_id", nullable = false)
     private User uploadedBy;
 
-    // Constructors
     public DocumentAttachment() {
     }
 
@@ -70,7 +66,6 @@ public class DocumentAttachment {
         this.uploadedBy = uploadedBy;
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

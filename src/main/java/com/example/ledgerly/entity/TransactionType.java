@@ -1,8 +1,5 @@
 package com.example.ledgerly.entity;
 
-/**
- * Enum representing different types of ledger transactions
- */
 public enum TransactionType {
     CREDIT("Credit", "Money received/incoming"),
     DEBIT("Debit", "Money paid/outgoing"),

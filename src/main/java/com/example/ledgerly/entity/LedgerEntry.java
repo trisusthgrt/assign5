@@ -14,9 +14,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Entity representing a ledger entry for credit/debit transactions
- */
 @Entity
 @Table(name = "ledger_entries")
 public class LedgerEntry {
@@ -76,7 +73,6 @@ public class LedgerEntry {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    // Relationships
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
@@ -93,12 +89,10 @@ public class LedgerEntry {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
-    // Document attachments (one-to-many)
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "ledger_entry_id")
     private List<DocumentAttachment> attachments = new ArrayList<>();
 
-    // Audit fields
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -107,7 +101,6 @@ public class LedgerEntry {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Constructors
     public LedgerEntry() {
     }
 
@@ -121,7 +114,6 @@ public class LedgerEntry {
         this.createdBy = createdBy;
     }
 
-    // Helper methods
     public void addAttachment(DocumentAttachment attachment) {
         attachments.add(attachment);
     }
@@ -139,7 +131,6 @@ public class LedgerEntry {
         return TransactionType.DEBIT.equals(this.transactionType);
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

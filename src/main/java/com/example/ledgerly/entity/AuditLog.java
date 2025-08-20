@@ -7,9 +7,6 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * Entity for maintaining audit logs of all system operations
- */
 @Entity
 @Table(name = "audit_logs")
 public class AuditLog {
@@ -64,7 +61,6 @@ public class AuditLog {
     @JoinColumn(name = "user_id")
     private User user;
 
-    // Constructors
     public AuditLog() {
     }
 
@@ -81,7 +77,6 @@ public class AuditLog {
         this.user = user;
     }
 
-    // Getters and Setters
     public Long getId() {
         return id;
     }

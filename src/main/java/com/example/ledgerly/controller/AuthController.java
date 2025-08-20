@@ -20,9 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * REST Controller for authentication operations
- */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -34,9 +31,6 @@ public class AuthController {
         this.userService = userService;
     }
 
-    /**
-     * Register a new user
-     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         try {
@@ -47,9 +41,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Login user
-     */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         try {
@@ -60,9 +51,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Get current user profile
-     */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getCurrentUser() {
@@ -87,9 +75,6 @@ public class AuthController {
         return ResponseEntity.ok(userInfo);
     }
 
-    /**
-     * Get all users (Admin and Owner only)
-     */
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -97,9 +82,6 @@ public class AuthController {
         return ResponseEntity.ok(users);
     }
 
-    /**
-     * Get users by role (Admin only)
-     */
     @GetMapping("/users/role/{role}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getUsersByRole(@PathVariable Role role) {
@@ -107,9 +89,6 @@ public class AuthController {
         return ResponseEntity.ok(users);
     }
 
-    /**
-     * Deactivate user (Admin and Owner only)
-     */
     @PutMapping("/users/{userId}/deactivate")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, String>> deactivateUser(@PathVariable Long userId) {
@@ -123,9 +102,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Activate user (Admin and Owner only)
-     */
     @PutMapping("/users/{userId}/activate")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, String>> activateUser(@PathVariable Long userId) {
@@ -139,9 +115,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Verify email (Admin only)
-     */
     @PutMapping("/users/{userId}/verify-email")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> verifyEmail(@PathVariable Long userId) {
@@ -155,9 +128,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Get user statistics (Admin only)
-     */
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getUserStats() {
@@ -170,9 +140,6 @@ public class AuthController {
         return ResponseEntity.ok(stats);
     }
 
-    /**
-     * Assign role to user (Admin and Owner only)
-     */
     @PutMapping("/users/assign-role")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> assignRole(@Valid @RequestBody RoleAssignmentRequest request) {
@@ -195,9 +162,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Get user by ID (Admin and Owner only)
-     */
     @GetMapping("/users/{userId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('OWNER')")
     public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long userId) {
@@ -225,9 +189,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Health check for auth service
-     */
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> authHealthCheck() {
         Map<String, Object> response = new HashMap<>();

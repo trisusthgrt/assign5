@@ -1,8 +1,5 @@
 package com.example.ledgerly.entity;
 
-/**
- * Enum representing different types of customer relationships
- */
 public enum RelationshipType {
     CUSTOMER("Customer"),
     SUPPLIER("Supplier"), 
