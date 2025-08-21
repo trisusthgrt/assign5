@@ -1,0 +1,16 @@
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.content-wrapper {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+.main-content {
+  flex-grow: 1;
+  padding: 2.5rem; /* More padding for a spacious feel */
+  overflow-y: auto;
+  background-color: #f1f3f5; /* Slightly off-white background for content */
+}

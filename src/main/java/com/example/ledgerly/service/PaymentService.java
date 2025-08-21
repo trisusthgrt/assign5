@@ -24,6 +24,12 @@ import java.util.stream.Collectors;
 
 /**
  * Service class for Payment operations including settlements and outstanding balance tracking
+ * 
+ * INTEGRATION NOTE: This service now automatically creates ledger entries when payments are recorded.
+ * This ensures that:
+ * 1. Customer exports (PDF/CSV) can include payment information
+ * 2. Ledger entries are properly linked to payments via reference numbers
+ * 3. The customer balance calculations include all payments
  */
 @Service
 @Transactional
@@ -34,6 +40,7 @@ public class PaymentService {
     private final CustomerRepository customerRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final UserRepository userRepository;
+    private final ShopRepository shopRepository;
     private final BusinessRuleService businessRuleService;
     private final AuditService auditService;
 
@@ -43,6 +50,7 @@ public class PaymentService {
                          CustomerRepository customerRepository,
                          LedgerEntryRepository ledgerEntryRepository,
                          UserRepository userRepository,
+                         ShopRepository shopRepository,
                          BusinessRuleService businessRuleService,
                          AuditService auditService) {
         this.paymentRepository = paymentRepository;
@@ -50,6 +58,7 @@ public class PaymentService {
         this.customerRepository = customerRepository;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.userRepository = userRepository;
+        this.shopRepository = shopRepository;
         this.businessRuleService = businessRuleService;
         this.auditService = auditService;
     }
@@ -74,6 +83,8 @@ public class PaymentService {
             // Create new payment
             Payment payment = new Payment();
             payment.setCustomer(customer);
+            // Ensure payment is associated with the same shop as the customer
+            payment.setShop(customer.getShop());
             payment.setPaymentDate(request.getPaymentDate());
             payment.setAmount(request.getAmount());
             payment.setDescription(request.getDescription().trim());
@@ -95,6 +106,9 @@ public class PaymentService {
 
             // Save payment
             Payment savedPayment = paymentRepository.save(payment);
+
+            // Automatically create a ledger entry for this payment
+            createLedgerEntryForPayment(savedPayment, currentUser);
 
             // Log successful creation
             auditService.logSuccess("RECORD_PAYMENT", "PAYMENT", savedPayment.getId(),
@@ -508,6 +522,80 @@ public class PaymentService {
     }
 
     /**
+     * Find ledger entry by payment reference number
+     */
+    private LedgerEntry findLedgerEntryByPaymentReference(String paymentReference) {
+        return ledgerEntryRepository.findByReferenceNumberIgnoreCaseAndIsActiveTrue(paymentReference)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Sync existing payments with ledger entries.
+     * This method can be used to create ledger entries for payments that were recorded
+     * before the automatic ledger entry creation was implemented.
+     */
+    public void syncExistingPaymentsWithLedgerEntries() {
+        User currentUser = getCurrentUser();
+        List<Payment> paymentsWithoutLedgerEntries = paymentRepository.findAll().stream()
+                .filter(payment -> {
+                    String reference = "PAY-" + payment.getId();
+                    return findLedgerEntryByPaymentReference(reference) == null;
+                })
+                .toList();
+
+        for (Payment payment : paymentsWithoutLedgerEntries) {
+            createLedgerEntryForPayment(payment, currentUser);
+        }
+    }
+
+    /**
+     * Automatically create a ledger entry for a newly recorded payment.
+     * This ensures that the payment amount is reflected in the customer's ledger.
+     * 
+     * INTEGRATION NOTE: This method creates a ledger entry every time a payment is recorded,
+     * which allows the export functionality to work properly. The ledger entry will show
+     * up in customer statements and transaction history exports.
+     */
+    private void createLedgerEntryForPayment(Payment payment, User currentUser) {
+        try {
+            LedgerEntry ledgerEntry = new LedgerEntry();
+            ledgerEntry.setCustomer(payment.getCustomer());
+            ledgerEntry.setShop(payment.getShop());
+            ledgerEntry.setTransactionDate(payment.getPaymentDate());
+            ledgerEntry.setDescription(payment.getDescription() != null ? payment.getDescription() : "Payment received");
+            ledgerEntry.setAmount(payment.getAmount());
+            ledgerEntry.setTransactionType(TransactionType.CREDIT); // Payment is a credit to the customer
+            ledgerEntry.setReferenceNumber("PAY-" + payment.getId()); // Link to payment
+            ledgerEntry.setPaymentMethod(payment.getPaymentMethod());
+            ledgerEntry.setNotes(payment.getNotes());
+            ledgerEntry.setActive(true);
+            ledgerEntry.setCreatedBy(currentUser);
+            ledgerEntry.setUpdatedBy(currentUser);
+
+            // Create audit snapshot before saving
+            Map<String, Object> auditSnapshot = auditService.createAuditSnapshot(ledgerEntry);
+
+            // Save ledger entry
+            LedgerEntry savedLedgerEntry = ledgerEntryRepository.save(ledgerEntry);
+
+            // Log successful creation
+            auditService.logSuccess("CREATE_LEDGER_ENTRY", "LEDGER_ENTRY", savedLedgerEntry.getId(),
+                    null, auditSnapshot,
+                    String.format("Created ledger entry for payment %d", payment.getId()),
+                    currentUser);
+        } catch (Exception e) {
+            // Log the error but don't fail the payment creation
+            auditService.logFailure("CREATE_LEDGER_ENTRY", "LEDGER_ENTRY", null,
+                    e.getMessage(),
+                    String.format("Failed to create ledger entry for payment %d", payment.getId()),
+                    currentUser);
+            // Don't rethrow - payment should still be created even if ledger entry fails
+        }
+    }
+
+    /**
      * Get current authenticated user
      */
     private User getCurrentUser() {
@@ -515,5 +603,34 @@ public class PaymentService {
         String username = authentication.getName();
         return userRepository.findByUsernameOrEmail(username)
                 .orElseThrow(() -> new RuntimeException("Current user not found"));
+    }
+
+    /**
+     * Get payments for shops owned by the current user (OWNER role)
+     */
+    public Page<PaymentResponse> getPaymentsForOwnerShops(int page, int size, String sortBy, String sortDir) {
+        User currentUser = getCurrentUser();
+        
+        // Get shops owned by the current user
+        List<Shop> ownerShops = shopRepository.findByOwnerIdAndIsActiveTrue(currentUser.getId());
+        
+        if (ownerShops.isEmpty()) {
+            // Return empty page if no shops owned
+            return Page.empty(PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy)));
+        }
+        
+        // Get shop IDs
+        List<Long> shopIds = ownerShops.stream()
+                .map(Shop::getId)
+                .toList();
+        
+        // Create pageable request
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
+        
+        // Get payments for owner's shops
+        Page<Payment> payments = paymentRepository.findByShopIdInAndIsActiveTrueOrderByPaymentDateDesc(shopIds, pageable);
+        
+        // Convert to DTOs
+        return payments.map(this::convertToPaymentResponse);
     }
 }

@@ -1,21 +1,20 @@
 import { inject } from '@angular/core';
-import { Router, ActivatedRouteSnapshot } from '@angular/router';
+import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { Role } from '../models/user.model';
 
-export const roleGuard = (route: ActivatedRouteSnapshot) => {
+export const roleGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const expectedRoles = route.data['roles'] as Role[];
+  const userRole = authService.getUserRole();
 
-  const requiredRoles = route.data['roles'] as string[];
+  if (!userRole || !expectedRoles.includes(userRole)) {
+    // Redirect to a default page if the role doesn't match
+    // You could create a specific 'unauthorized' component
+    router.navigate(['/']); 
+    return false;
+  }
   
-  if (!requiredRoles || requiredRoles.length === 0) {
-    return true;
-  }
-
-  if (authService.hasAnyRole(requiredRoles)) {
-    return true;
-  }
-
-  router.navigate(['/dashboard']);
-  return false;
+  return true;
 };

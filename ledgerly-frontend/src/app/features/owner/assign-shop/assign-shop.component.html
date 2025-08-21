@@ -1,0 +1,29 @@
+<div class="management-container">
+  <div class="header">
+    <h2>Assign Staff to Shop</h2>
+  </div>
+
+  <form [formGroup]="assignForm" (ngSubmit)="onSubmit()" class="data-form">
+    <div class="form-group">
+      <label for="staffId">Select Staff</label>
+      <select id="staffId" formControlName="staffId">
+        <option [ngValue]="null" disabled>-- Choose Staff --</option>
+        <option *ngFor="let staff of staffList" [value]="staff.id">
+          {{ staff.firstName }} {{ staff.lastName }} ({{ staff.username }})
+        </option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="shopId">Select Shop</label>
+      <select id="shopId" formControlName="shopId">
+        <option [ngValue]="null" disabled>-- Choose Shop --</option>
+        <option *ngFor="let shop of shops" [value]="shop.id">
+          {{ shop.name }}
+        </option>
+      </select>
+    </div>
+    <button type="submit" [disabled]="assignForm.invalid">Assign</button>
+    <p *ngIf="successMessage" class="success-message">{{ successMessage }}</p>
+    <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+  </form>
+</div>

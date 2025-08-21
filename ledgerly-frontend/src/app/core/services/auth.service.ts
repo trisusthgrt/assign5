@@ -1,150 +1,99 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, catchError, of } from 'rxjs';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { AuthResponse, DecodedToken } from '../models/auth.model';
+import { jwtDecode } from 'jwt-decode';
+import { StorageService } from './storage.service';
 import { Router } from '@angular/router';
-
-import { environment } from '../../../environments/environment';
-import { User } from '../models/user.model';
-import { LoginRequest, RegisterRequest, AuthResponse } from '../models/auth.model';
+import { Role } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = environment.apiUrl;
-  private currentUserSubject = new BehaviorSubject<User | null>(null);
-  private tokenSubject = new BehaviorSubject<string | null>(null);
+  private http = inject(HttpClient);
+  private storageService = inject(StorageService);
+  private router = inject(Router);
 
-  public currentUser$ = this.currentUserSubject.asObservable();
-  public token$ = this.tokenSubject.asObservable();
+  private apiUrl = 'http://localhost:8080/api/v1/auth';
 
-  constructor(
-    private http: HttpClient,
-    private router: Router
-  ) {
-    this.loadStoredAuth();
+  // BehaviorSubjects are great for reacting to state changes in your UI (e.g., sidebar)
+  private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasValidToken());
+  isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
+
+  private currentUserRoleSubject = new BehaviorSubject<Role | null>(this.getUserRole());
+  currentUserRole$ = this.currentUserRoleSubject.asObservable();
+
+  register(data: any): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data);
   }
 
-  get currentUserValue(): User | null {
-    return this.currentUserSubject.value;
-  }
-
-  get tokenValue(): string | null {
-    return this.tokenSubject.value;
-  }
-
-  get isAuthenticated(): boolean {
-    return !!this.tokenValue && !!this.currentUserValue;
-  }
-
-  login(credentials: LoginRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/auth/login`, credentials)
-      .pipe(
-        tap(response => {
-          this.setAuth(response);
-          this.router.navigate(['/dashboard']);
-        }),
-        catchError(error => {
-          console.error('Login error:', error);
-          throw error;
-        })
-      );
-  }
-
-  register(userData: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/auth/register`, userData)
-      .pipe(
-        tap(response => {
-          this.setAuth(response);
-          this.router.navigate(['/dashboard']);
-        }),
-        catchError(error => {
-          console.error('Registration error:', error);
-          throw error;
-        })
-      );
+  login(credentials: any): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
+      tap((response: AuthResponse) => this.setSession(response))
+    );
   }
 
   logout(): void {
-    this.clearAuth();
+    this.storageService.removeItem('auth_token');
+    // Update the streams so the rest of the app knows the user has logged out
+    this.isAuthenticatedSubject.next(false);
+    this.currentUserRoleSubject.next(null);
     this.router.navigate(['/auth/login']);
   }
 
-  refreshUser(): Observable<User | null> {
-    if (!this.tokenValue) {
-      return of(null);
+  private setSession(authResponse: AuthResponse): void {
+    this.storageService.setItem('auth_token', authResponse.token);
+    // Update the streams so the rest of the app knows the user has logged in
+    this.isAuthenticatedSubject.next(true);
+    this.currentUserRoleSubject.next(this.getUserRole());
+  }
+
+  getToken(): string | null {
+    return this.storageService.getItem('auth_token');
+  }
+
+  // This is the NEW public, synchronous method for the guards.
+  // It provides an immediate, real-time answer without relying on observables.
+  isAuthenticated(): boolean {
+    const token = this.getToken();
+    if (!token) {
+      return false;
     }
 
-    return this.http.get<User>(`${this.API_URL}/auth/me`)
-      .pipe(
-        tap(user => this.currentUserSubject.next(user)),
-        catchError(error => {
-          console.error('Error refreshing user:', error);
-          this.logout();
-          return of(null);
-        })
-      );
+    try {
+      const decoded: DecodedToken = jwtDecode(token);
+      const isExpired = Date.now() >= decoded.exp * 1000;
+      return !isExpired; // Returns true if the token exists AND is not expired
+    } catch (error) {
+      // If jwt-decode fails, the token is malformed and not valid.
+      return false;
+    }
   }
 
-  updateProfile(updateData: any): Observable<User> {
-    return this.http.put<User>(`${this.API_URL}/profile`, updateData)
-      .pipe(
-        tap(user => this.currentUserSubject.next(user))
-      );
+  // This is the original private method used to initialize the BehaviorSubject.
+  private hasValidToken(): boolean {
+    // Its logic is identical to the new public method.
+    return this.isAuthenticated();
   }
 
-  private setAuth(response: AuthResponse): void {
-    const user: User = {
-      id: response.userId,
-      username: response.username,
-      email: response.email,
-      firstName: response.firstName,
-      lastName: response.lastName,
-      role: response.role as any,
-      isActive: true,
-      isEmailVerified: response.emailVerified,
-      isPhoneVerified: response.phoneVerified,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem('token', response.token);
-    localStorage.setItem('user', JSON.stringify(user));
-
-    this.tokenSubject.next(response.token);
-    this.currentUserSubject.next(user);
-  }
-
-  private clearAuth(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    this.tokenSubject.next(null);
-    this.currentUserSubject.next(null);
-  }
-
-  private loadStoredAuth(): void {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-
-    if (token && userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        this.tokenSubject.next(token);
-        this.currentUserSubject.next(user);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        this.clearAuth();
+  getUserRole(): Role | null {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const decoded: any = jwtDecode(token);
+      // Backend sends ROLE_ADMIN, ROLE_OWNER, ROLE_STAFF format
+      if (decoded.authorities && decoded.authorities.length > 0) {
+        const authority = decoded.authorities[0];
+        // Remove "ROLE_" prefix to get the actual role
+        if (authority.startsWith('ROLE_')) {
+          const role = authority.substring(5); // Remove "ROLE_" prefix
+          return role as Role;
+        }
       }
+      return null;
+    } catch (error) {
+      return null;
     }
-  }
-
-  hasRole(role: string): boolean {
-    const user = this.currentUserValue;
-    return user?.role === role;
-  }
-
-  hasAnyRole(roles: string[]): boolean {
-    const user = this.currentUserValue;
-    return user ? roles.includes(user.role) : false;
   }
 }

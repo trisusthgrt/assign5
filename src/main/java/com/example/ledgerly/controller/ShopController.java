@@ -6,6 +6,14 @@ import com.example.ledgerly.entity.Shop;
 import com.example.ledgerly.entity.User;
 import com.example.ledgerly.repository.ShopRepository;
 import com.example.ledgerly.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +35,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api/v1/shops")
+@Tag(name = "Shop Management", description = "Business shop/location management endpoints")
 public class ShopController {
 
     private static final Logger logger = LoggerFactory.getLogger(ShopController.class);
@@ -45,6 +54,21 @@ public class ShopController {
      */
     @PostMapping
     @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
+    @Operation(summary = "Create a new shop", description = "Creates a new shop for the authenticated user.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Shop created successfully",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "409", description = "Shop name already exists for this owner",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request body",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid token",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - not owner or admin",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "500", description = "Server error",
+                     content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     public ResponseEntity<Map<String, Object>> createShop(@Valid @RequestBody ShopCreateRequest request, 
                                                          Authentication authentication) {
         try {
@@ -100,6 +124,17 @@ public class ShopController {
      */
     @GetMapping("/my-shops")
     @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
+    @Operation(summary = "Get all shops owned by the authenticated user", description = "Retrieves all active shops owned by the authenticated user.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Shops retrieved successfully",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid token",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - not owner or admin",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "500", description = "Server error",
+                     content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     public ResponseEntity<Map<String, Object>> getMyShops(Authentication authentication) {
         try {
             User currentUser = userRepository.findByUsername(authentication.getName())
@@ -131,6 +166,19 @@ public class ShopController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
+    @Operation(summary = "Get a shop by its ID", description = "Retrieves a shop by its ID if the user is the owner or an admin.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Shop retrieved successfully",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid token",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - not owner or admin",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "404", description = "Shop not found",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "500", description = "Server error",
+                     content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     public ResponseEntity<Map<String, Object>> getShopById(@PathVariable Long id, Authentication authentication) {
         try {
             User currentUser = userRepository.findByUsername(authentication.getName())
@@ -168,6 +216,21 @@ public class ShopController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
+    @Operation(summary = "Update a shop by its ID", description = "Updates a shop by its ID if the user is the owner or an admin.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Shop updated successfully",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid token",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - not owner or admin",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "404", description = "Shop not found",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid request body",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "500", description = "Server error",
+                     content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     public ResponseEntity<Map<String, Object>> updateShop(@PathVariable Long id, 
                                                          @Valid @RequestBody ShopCreateRequest request,
                                                          Authentication authentication) {
@@ -223,6 +286,19 @@ public class ShopController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('OWNER') or hasRole('ADMIN')")
+    @Operation(summary = "Delete a shop by its ID", description = "Deletes a shop by its ID if the user is the owner or an admin.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Shop deleted successfully",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid token",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "403", description = "Access denied - not owner or admin",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "404", description = "Shop not found",
+                     content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "500", description = "Server error",
+                     content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     public ResponseEntity<Map<String, Object>> deleteShop(@PathVariable Long id, Authentication authentication) {
         try {
             User currentUser = userRepository.findByUsername(authentication.getName())

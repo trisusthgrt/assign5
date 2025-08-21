@@ -51,6 +51,11 @@ public class UserService implements UserDetailsService {
             throw new RuntimeException("OWNER role can only be created by an ADMIN.");
         }
         
+        // Prevent self-registration as STAFF (only OWNER can create STAFF accounts)
+        if (request.getRole() == Role.STAFF) {
+            throw new RuntimeException("STAFF role can only be created by an OWNER.");
+        }
+        
         // Temporarily allow ADMIN registration for testing
         // TODO: Remove this after testing and implement proper admin creation flow
         
@@ -257,5 +262,32 @@ public class UserService implements UserDetailsService {
         response.setEmailVerified(user.isEmailVerified());
         response.setPhoneVerified(user.isPhoneVerified());
         return response;
+    }
+
+    /**
+     * Change user password
+     */
+    public boolean changePassword(String usernameOrEmail, String currentPassword, String newPassword) {
+        // Find user by username or email
+        User user = userRepository.findByUsernameOrEmail(usernameOrEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+        
+        // Check if new password is same as current password
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new RuntimeException("New password must be different from current password");
+        }
+        
+        // Encode and set new password
+        user.setPassword(passwordEncoder.encode(newPassword));
+        
+        // Save updated user
+        userRepository.save(user);
+        
+        return true;
     }
 }

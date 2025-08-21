@@ -1,0 +1,38 @@
+<div class="management-container">
+  <div class="header">
+    <h2>Manage Shops</h2>
+    <button (click)="toggleForm()">{{ showForm ? 'Cancel' : 'Add Shop' }}</button>
+  </div>
+
+  <form *ngIf="showForm" [formGroup]="shopForm" (ngSubmit)="onSubmit()" class="data-form">
+    <div class="form-group"><label>Shop Name</label><input formControlName="name"></div>
+    <div class="form-group"><label>Description</label><input formControlName="description"></div>
+    <div class="form-group"><label>Address</label><input formControlName="address"></div>
+    <div class="form-group"><label>Phone</label><input formControlName="phoneNumber"></div>
+    <div class="form-group"><label>Email</label><input type="email" formControlName="email"></div>
+    <button type="submit" [disabled]="shopForm.invalid">Save Shop</button>
+  </form>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Address</th>
+        <th>Phone</th>
+        <th>Email</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let shop of shops">
+        <td>{{ shop.name }}</td>
+        <td>{{ shop.address }}</td>
+        <td>{{ shop.phoneNumber }}</td>
+        <td>{{ shop.email }}</td>
+        <td>
+          <button class="delete-btn" (click)="deleteShop(shop.id)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

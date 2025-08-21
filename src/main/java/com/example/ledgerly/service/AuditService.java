@@ -23,6 +23,9 @@ import java.util.Map;
 @Service
 public class AuditService {
 
+    private static final int MAX_ERROR_LEN = 1000; // must match entity constraint
+    private static final int MAX_DESC_LEN = 1000;  // conservative default
+
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
@@ -43,7 +46,7 @@ public class AuditService {
             auditLog.setAction(action);
             auditLog.setEntityType(entityType);
             auditLog.setEntityId(entityId);
-            auditLog.setDescription(description);
+            auditLog.setDescription(truncate(description, MAX_DESC_LEN));
             auditLog.setUser(user);
             auditLog.setSuccess(true);
 
@@ -72,8 +75,8 @@ public class AuditService {
             auditLog.setAction(action);
             auditLog.setEntityType(entityType);
             auditLog.setEntityId(entityId);
-            auditLog.setDescription(description);
-            auditLog.setErrorMessage(errorMessage);
+            auditLog.setDescription(truncate(description, MAX_DESC_LEN));
+            auditLog.setErrorMessage(truncate(errorMessage, MAX_ERROR_LEN));
             auditLog.setUser(user);
             auditLog.setSuccess(false);
 
@@ -95,8 +98,9 @@ public class AuditService {
             auditLog.setAction("BUSINESS_RULE_VIOLATION");
             auditLog.setEntityType(entityType);
             auditLog.setEntityId(entityId);
-            auditLog.setDescription(String.format("Rule: %s - %s. Original Action: %s", ruleCode, ruleDescription, action));
-            auditLog.setErrorMessage(ruleDescription);
+            String desc = String.format("Rule: %s - %s. Original Action: %s", ruleCode, ruleDescription, action);
+            auditLog.setDescription(truncate(desc, MAX_DESC_LEN));
+            auditLog.setErrorMessage(truncate(ruleDescription, MAX_ERROR_LEN));
             auditLog.setUser(user);
             auditLog.setSuccess(false);
 
@@ -175,7 +179,7 @@ public class AuditService {
         try {
             return objectMapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
-            return "Error serializing object: " + e.getMessage();
+            return truncate("Error serializing object: " + e.getMessage(), MAX_ERROR_LEN);
         }
     }
 
@@ -190,10 +194,15 @@ public class AuditService {
             Map<String, Object> map = objectMapper.readValue(json, Map.class);
             return map;
         } catch (Exception e) {
-            snapshot.put("error", "Failed to create snapshot: " + e.getMessage());
-            snapshot.put("entity", entity.toString());
+            snapshot.put("error", truncate("Failed to create snapshot: " + e.getMessage(), MAX_ERROR_LEN));
+            snapshot.put("entity", truncate(String.valueOf(entity), MAX_DESC_LEN));
             return snapshot;
         }
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() > max ? value.substring(0, max) : value;
     }
 
     /**

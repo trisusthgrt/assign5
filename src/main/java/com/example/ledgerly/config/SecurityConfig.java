@@ -82,9 +82,11 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(authz -> authz
                 // Public endpoints
-                .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/health").permitAll()
+                .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/change-password", "/api/v1/auth/health").permitAll()
                 .requestMatchers("/api/v1/health/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                // Ledger endpoints (require authentication but not specific roles)
+                .requestMatchers("/api/v1/ledger/**").authenticated()
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )

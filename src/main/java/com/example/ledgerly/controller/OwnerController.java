@@ -64,6 +64,11 @@ public class OwnerController {
             logger.warn("Username or email already exists: username={}, email={}", request.getUsername(), request.getEmail());
             return ResponseEntity.status(409).build();
         }
+        
+        // Get current user
+        User currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -73,16 +78,29 @@ public class OwnerController {
         user.setRole(Role.STAFF);
         user.setEmailVerified(true);
         user.setActive(true);
+        user.setCreatedBy(currentUser); // Set the creator
+        
         User saved = userRepository.save(user);
-        logger.info("Successfully created staff user: {}", saved.getUsername());
+        logger.info("Successfully created staff user: {} by owner: {}", saved.getUsername(), currentUser.getUsername());
         return ResponseEntity.created(URI.create("/api/v1/owner/staff/" + saved.getId())).body(toDto(saved));
     }
 
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<BasicUserResponse> updateStaff(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest request) {
+    public ResponseEntity<BasicUserResponse> updateStaff(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest request, Authentication auth) {
+        // Get current user
+        User currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        
         return userRepository.findById(id)
                 .filter(u -> u.getRole() == Role.STAFF)
+                .filter(u -> {
+                    // ADMIN can update any staff, OWNER can only update staff they created
+                    if (currentUser.getRole() == Role.ADMIN) {
+                        return true;
+                    }
+                    return u.getCreatedBy() != null && u.getCreatedBy().getId().equals(currentUser.getId());
+                })
                 .map(u -> {
                     u.setFirstName(request.getFirstName());
                     u.setLastName(request.getLastName());
@@ -95,9 +113,20 @@ public class OwnerController {
 
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteStaff(@PathVariable Long id) {
+    public ResponseEntity<?> deleteStaff(@PathVariable Long id, Authentication auth) {
+        // Get current user
+        User currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        
         return userRepository.findById(id)
                 .filter(u -> u.getRole() == Role.STAFF)
+                .filter(u -> {
+                    // ADMIN can delete any staff, OWNER can only delete staff they created
+                    if (currentUser.getRole() == Role.ADMIN) {
+                        return true;
+                    }
+                    return u.getCreatedBy() != null && u.getCreatedBy().getId().equals(currentUser.getId());
+                })
                 .map(u -> {
                     userRepository.delete(u);
                     return ResponseEntity.noContent().build();
@@ -107,10 +136,24 @@ public class OwnerController {
 
     @PreAuthorize("hasAnyRole('OWNER','ADMIN')")
     @GetMapping
-    public ResponseEntity<List<BasicUserResponse>> listStaff() {
-        List<BasicUserResponse> staff = userRepository.findByRole(Role.STAFF).stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public ResponseEntity<List<BasicUserResponse>> listStaff(Authentication auth) {
+        // Get current user
+        User currentUser = userRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Current user not found"));
+        
+        List<BasicUserResponse> staff;
+        if (currentUser.getRole() == Role.ADMIN) {
+            // ADMIN can see all staff
+            staff = userRepository.findByRole(Role.STAFF).stream()
+                    .map(this::toDto)
+                    .collect(Collectors.toList());
+        } else {
+            // OWNER can only see staff they created
+            staff = userRepository.findByRole(Role.STAFF).stream()
+                    .filter(u -> u.getCreatedBy() != null && u.getCreatedBy().getId().equals(currentUser.getId()))
+                    .map(this::toDto)
+                    .collect(Collectors.toList());
+        }
         return ResponseEntity.ok(staff);
     }
     

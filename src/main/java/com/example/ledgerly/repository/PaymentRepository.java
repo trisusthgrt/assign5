@@ -196,4 +196,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      */
     @Query("SELECT p FROM Payment p WHERE p.customer.id = :customerId AND p.amount > p.appliedAmount AND p.status IN ('PENDING', 'PARTIAL') AND p.isActive = true ORDER BY p.paymentDate ASC")
     List<Payment> findApplicablePaymentsByCustomer(@Param("customerId") Long customerId);
+
+    /**
+     * Find payments by shop IDs with pagination
+     */
+    Page<Payment> findByShopIdInAndIsActiveTrueOrderByPaymentDateDesc(List<Long> shopIds, Pageable pageable);
 }

@@ -1,0 +1,39 @@
+<div class="management-container">
+  <div class="header">
+    <h2>Manage Staff</h2>
+    <button (click)="toggleForm()">{{ showForm ? 'Cancel' : 'Add Staff' }}</button>
+  </div>
+
+  <form *ngIf="showForm" [formGroup]="staffForm" (ngSubmit)="onSubmit()" class="data-form">
+    <!-- Form fields are identical to owner-management form -->
+    <div class="form-group"><label>Username</label><input formControlName="username"></div>
+    <div class="form-group"><label>Email</label><input type="email" formControlName="email"></div>
+    <div class="form-group"><label>Password</label><input type="password" formControlName="password"></div>
+    <div class="form-group"><label>First Name</label><input formControlName="firstName"></div>
+    <div class="form-group"><label>Last Name</label><input formControlName="lastName"></div>
+    <button type="submit" [disabled]="staffForm.invalid">Save Staff</button>
+  </form>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Full Name</th>
+        <th>Role</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let staff of staffList">
+        <td>{{ staff.username }}</td>
+        <td>{{ staff.email }}</td>
+        <td>{{ staff.firstName }} {{ staff.lastName }}</td>
+        <td>{{ staff.role }}</td>
+        <td>
+          <button class="delete-btn" (click)="deleteStaff(staff.id)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

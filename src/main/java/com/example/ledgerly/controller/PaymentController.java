@@ -591,4 +591,36 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
+    /**
+     * Get payments for shops owned by the current user (OWNER role)
+     */
+    @GetMapping("/owner/shops")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<Map<String, Object>> getPaymentsForOwnerShops(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "paymentDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        
+        try {
+            Page<PaymentResponse> payments = paymentService.getPaymentsForOwnerShops(page, size, sortBy, sortDir);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("payments", payments.getContent());
+            response.put("totalElements", payments.getTotalElements());
+            response.put("totalPages", payments.getTotalPages());
+            response.put("currentPage", payments.getNumber());
+            response.put("size", payments.getSize());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch payments for owner shops: " + e.getMessage());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
 }

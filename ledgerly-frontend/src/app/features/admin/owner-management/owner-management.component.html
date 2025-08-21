@@ -1,0 +1,75 @@
+<div class="management-container">
+  <div class="header">
+    <h2>Manage Owners</h2>
+    <button (click)="toggleForm()">{{ showForm ? 'Cancel' : 'Add Owner' }}</button>
+  </div>
+
+  <!-- Add Owner Form (This part is the same) -->
+  <form *ngIf="showForm" [formGroup]="ownerForm" (ngSubmit)="onSubmit()" class="data-form">
+    <h3>Add New Owner</h3>
+    <!-- ... form fields for adding owner ... -->
+    <div class="form-group"><label>Username</label><input formControlName="username"></div>
+    <div class="form-group"><label>Email</label><input type="email" formControlName="email"></div>
+    <div class="form-group"><label>Password</label><input type="password" formControlName="password"></div>
+    <div class="form-group"><label>First Name</label><input formControlName="firstName"></div>
+    <div class="form-group"><label>Last Name</label><input formControlName="lastName"></div>
+    <button type="submit" [disabled]="ownerForm.invalid">Save Owner</button>
+  </form>
+
+  <!-- Owners Table -->
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Full Name</th>
+        <th>Role</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let owner of owners">
+        <td>{{ owner.username }}</td>
+        <td>{{ owner.email }}</td>
+        <td>{{ owner.firstName }} {{ owner.lastName }}</td>
+        <td>{{ owner.role }}</td>
+        <td class="actions-cell">
+          <!-- **** NEW: EDIT BUTTON **** -->
+          <button class="edit-btn" (click)="openEditModal(owner)">Edit</button>
+          <button class="delete-btn" (click)="deleteOwner(owner.id)">Delete</button>
+        </td>
+      </tr>
+       <tr *ngIf="owners.length === 0">
+        <td colspan="5" style="text-align: center;">No owners found. Add one to get started.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- **** NEW: EDIT MODAL DIALOG **** -->
+<!-- This whole section is new. It's hidden by default and appears when isEditModalVisible is true -->
+<div *ngIf="isEditModalVisible" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Owner: {{ currentEditingOwner?.username }}</h3>
+      <button class="close-btn" (click)="closeEditModal()">×</button>
+    </div>
+    <form [formGroup]="editOwnerForm" (ngSubmit)="onUpdateSubmit()" class="data-form">
+        <!-- Note: We don't allow editing username or password in this form, matching the backend API -->
+        <div class="form-group">
+            <label>First Name</label>
+            <input formControlName="firstName">
+        </div>
+        <div class="form-group">
+            <label>Last Name</label>
+            <input formControlName="lastName">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" formControlName="email">
+        </div>
+        <button type="submit" [disabled]="editOwnerForm.invalid">Save Changes</button>
+    </form>
+  </div>
+</div>

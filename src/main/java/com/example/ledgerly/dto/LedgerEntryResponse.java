@@ -31,6 +31,10 @@ public class LedgerEntryResponse {
     private Long customerId;
     private String customerName;
     
+    // Shop information
+    private Long shopId;
+    private String shopName;
+    
     // User information
     private String createdByUsername;
     private String updatedByUsername;
@@ -194,6 +198,22 @@ public class LedgerEntryResponse {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public Long getShopId() {
+        return shopId;
+    }
+
+    public void setShopId(Long shopId) {
+        this.shopId = shopId;
+    }
+
+    public String getShopName() {
+        return shopName;
+    }
+
+    public void setShopName(String shopName) {
+        this.shopName = shopName;
     }
 
     public String getCreatedByUsername() {
