@@ -42,3 +42,4 @@ public class SwaggerConfig {
                                 .description("Enter JWT token in the format: Bearer <token>")));
     }
 }
+

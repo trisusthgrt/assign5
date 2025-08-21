@@ -247,3 +247,4 @@ mvn spring-boot:run
 **Swagger/OpenAPI implementation is now complete and ready for use! 🚀**
 
 Your Ledgerly API now has professional-grade, interactive documentation that will significantly improve the developer experience and API discoverability.
+

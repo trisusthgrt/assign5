@@ -1465,3 +1465,4 @@ POST /api/v1/auth/login
 - IDs in URLs should be replaced with actual entity IDs
 - The collection uses Bearer token authentication automatically
 - Some endpoints may require specific user roles to access
+

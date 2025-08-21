@@ -144,3 +144,4 @@ The implementation successfully enforces the business rules that:
 - Provide audit trail for compliance
 
 This creates a secure, compliant, and business-logic-aligned staff management system.
+

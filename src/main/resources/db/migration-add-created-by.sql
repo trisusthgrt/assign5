@@ -16,3 +16,4 @@ CREATE INDEX idx_users_created_by ON users(created_by);
 -- Update existing users to set created_by to NULL (they were created before this feature)
 -- This is safe as the column allows NULL values
 UPDATE users SET created_by = NULL WHERE created_by IS NULL;
+
