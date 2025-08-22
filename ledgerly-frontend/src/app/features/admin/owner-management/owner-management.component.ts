@@ -819,9 +819,9 @@ export class OwnerManagementComponent implements OnInit {
     const formValue = this.ownerForm.value;
     if (formValue.username && formValue.email && formValue.password && formValue.firstName && formValue.lastName) {
       this.adminService.createOwner(formValue as any).subscribe(() => {
-        this.loadOwners();
-        this.toggleForm();
-      });
+      this.loadOwners();
+      this.toggleForm();
+    });
     }
   }
 
